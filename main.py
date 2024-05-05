@@ -55,8 +55,8 @@ class BayesNet:
             # Find the set of all unvisited nodes with no unvisited children
             candidates = [var for var in self.vars if not visited[var] and all(visited[child] for child in self.get_children(var))]
 
-            # Choose the node with the least amount of parents that are not evidence variables
-            candidates.sort(key=lambda var: (len([parent for parent in self.get_parents(var) if parent not in evidence]), var))
+            # Choose the node with the least amount of total nodes in the set of its parents and itself that are not evidence variables
+            candidates.sort(key=lambda var: (len([node for node in self.get_parents(var) + [var] if node not in evidence]), var))
             var = candidates[0]
             visited[var] = True
 
@@ -284,7 +284,9 @@ def variable_elimination(X, e, bn):
     factors = []
 
     for var in var_order:
-        factors.append(Factor(bn, e, var))
+        factor = Factor(bn, e, var)
+        if factor.dependencies:
+            factors.append(factor)
 
         if var in sum_over:
             # Find all factors with the current variable as a dependency
