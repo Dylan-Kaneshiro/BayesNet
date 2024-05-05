@@ -41,6 +41,29 @@ class BayesNet:
             sorted_vars.append(var)
 
         return sorted_vars
+    
+    def get_children(self, var):
+        """Return the children of a variable."""
+        return [node for node in self.nodes if var in self.get_parents(node)]
+
+    def topological_sort_elim(self, evidence):
+        """Return a list of the variables ordered based on elimination ordering."""
+        visited = {var: False for var in self.vars}
+        sorted_vars = []
+
+        while len(sorted_vars) < len(self.vars):
+            # Find the set of all unvisited nodes with no unvisited children
+            candidates = [var for var in self.vars if not visited[var] and all(visited[child] for child in self.get_children(var))]
+
+            # Choose the node with the least amount of parents that are not evidence variables
+            candidates.sort(key=lambda var: (len([parent for parent in self.get_parents(var) if parent not in evidence]), var))
+            var = candidates[0]
+            visited[var] = True
+
+            # Add the visited node to the sorted list
+            sorted_vars.append(var)
+
+        return sorted_vars
 
 def parse_bayes_net(filename):
     """Parse the Bayesian network from the specified file."""
@@ -165,13 +188,13 @@ def main():
 
     path_to_bayesnet_file, method, query = sys.argv[1:]
     bayes_net = parse_bayes_net(path_to_bayesnet_file)
+    X, e = parse_query(query)
 
     if method == "enum":
-        X, e = parse_query(query)
         enumeration_ask(X, e, bayes_net)
     elif method == "elim":
-        # Call to variable elimination function (not implemented here)
-        pass
+        # Call to variable elimination function
+        print(bayes_net.topological_sort_elim(e.keys()))
     else:
         print("Invalid method. Choose 'elim' or 'enum'.")
 
