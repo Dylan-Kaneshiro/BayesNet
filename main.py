@@ -302,7 +302,7 @@ def variable_elimination(X, e, bn):
         print("Factors:")
         for fr in factors:
             for values, prob in fr.probabilities.items():
-                print(f"{dict(values)}: {prob}")
+                print(f"{' '.join(f'{k}={v}' for k, v in dict(values).items())}: {prob}")
             print()
 
 
@@ -312,8 +312,8 @@ def variable_elimination(X, e, bn):
     print(f"RESULT:")
     result = {values[0][1]:prob for values, prob in final_factor.probabilities.items()}
     result = normalize(result)
-    for key, value in result.items():
-        print(f"P({X} = {key} | {dict(e)}) = {value}")
+    for key, value in sorted(result.items(), key=lambda x: x[0]):
+        print(f"P({X} = {key} | {', '.join(f'{k} = {v}' for k, v in e.items())}) = {value}")
 
 def main():
     if len(sys.argv) != 4:
