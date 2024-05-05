@@ -181,6 +181,82 @@ def parse_query(query):
 
     return X, e
 
+
+# ELIMINATION
+
+import itertools
+
+class Factor:
+    def __init__(self, bn, evidence, target="Dylan14"):
+        self.bn = bn
+        self.target = target
+        self.evidence = evidence
+
+        
+        if target != "Dylan14":
+          # Initialize dependencies to include the target variable and its parents, excluding evidence variables
+          self.dependencies = [var for var in [self.target] + self.bn.get_parents(self.target) if var not in self.evidence]
+
+          # Pre-calculate all possible probabilities
+          self.probabilities = {}
+          for values in itertools.product(['t', 'f'], repeat=len(self.dependencies)):
+              values_dict = dict(zip(self.dependencies, values))
+              combined_values = {**self.evidence, **values_dict}
+              self.probabilities[tuple(sorted(values_dict.items()))] = probability(self.target, combined_values[self.target], combined_values, self.bn)
+
+
+    def query(self, values):
+        # Check that all dependencies have defined values
+        if set(values.keys()) != set(self.dependencies):
+            raise ValueError("All dependencies must have defined values")
+
+        # Retrieve the pre-calculated probability
+        return self.probabilities[tuple(sorted(values.items()))]
+
+    def group_by(self, var):
+        # Create a new factor with the same dependencies excluding the grouped variable and the same evidence
+        dependencies = [dependency for dependency in self.dependencies if dependency != var]
+        new_factor = Factor(self.bn, self.evidence)
+        new_factor.dependencies = dependencies
+
+        # Pre-calculate all possible probabilities
+        new_factor.probabilities = {}
+        for values in itertools.product(['t', 'f'], repeat=len(dependencies)):
+            values_dict = dict(zip(dependencies, values))
+            combined_values = {**self.evidence, **values_dict}
+
+            # The probability of the new factor is the sum of the probabilities of the original factor for all values of the grouped variable
+            prob_sum = 0
+            for var_value in ['t', 'f']:
+                combined_values[var] = var_value
+                prob_sum += self.query({**values_dict, var: var_value})
+
+            new_factor.probabilities[tuple(sorted(values_dict.items()))] = prob_sum
+
+        return new_factor
+
+    @classmethod
+    def join(cls, factor1, factor2):
+        # Create a new factor with the combined dependencies and evidence
+        dependencies = list(set(factor1.dependencies + factor2.dependencies))
+        evidence = {**factor1.evidence, **factor2.evidence}
+
+        new_factor = cls(factor1.bn, evidence)
+        new_factor.dependencies = dependencies
+
+        # Pre-calculate all possible probabilities
+        new_factor.probabilities = {}
+        for values in itertools.product(['t', 'f'], repeat=len(dependencies)):
+            values_dict = dict(zip(dependencies, values))
+            combined_values = {**evidence, **values_dict}
+
+            # The probability of the new factor is the product of the probabilities of the two factors
+            prob1 = factor1.query({var: combined_values[var] for var in factor1.dependencies})
+            prob2 = factor2.query({var: combined_values[var] for var in factor2.dependencies})
+            new_factor.probabilities[tuple(sorted(values_dict.items()))] = prob1 * prob2
+
+        return new_factor
+
 def main():
     if len(sys.argv) != 4:
         print("Usage: python main.py <path_to_bayesnet_file> <elim|enum> <query>")
@@ -194,6 +270,7 @@ def main():
         enumeration_ask(X, e, bayes_net)
     elif method == "elim":
         # Call to variable elimination function
+        print(bayes_net.nodes)
         print(bayes_net.topological_sort_elim(e.keys()))
     else:
         print("Invalid method. Choose 'elim' or 'enum'.")
