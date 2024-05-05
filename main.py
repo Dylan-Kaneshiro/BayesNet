@@ -28,16 +28,17 @@ class BayesNet:
         visited = {var: False for var in self.vars}
         sorted_vars = []
 
-        def visit(var):
-            if not visited[var]:
-                visited[var] = True
-                parents = self.get_parents(var)
-                for parent in sorted(parents):  # Sort parents alphabetically
-                    visit(parent)
-                sorted_vars.append(var)
+        while len(sorted_vars) < len(self.vars):
+            # Find the set of all unvisited nodes with no unvisited parents
+            candidates = [var for var in self.vars if not visited[var] and all(visited[parent] for parent in self.get_parents(var))]
 
-        for var in sorted(self.vars):  # Sort variables alphabetically
-            visit(var)
+            # Sort the candidates alphabetically and visit the first one
+            candidates.sort()
+            var = candidates[0]
+            visited[var] = True
+
+            # Add the visited node to the sorted list
+            sorted_vars.append(var)
 
         return sorted_vars
 
