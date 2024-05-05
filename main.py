@@ -256,6 +256,64 @@ class Factor:
             new_factor.probabilities[tuple(sorted(values_dict.items()))] = prob1 * prob2
 
         return new_factor
+    
+    @staticmethod
+    def join_all(factors):
+        if not factors:
+            return None
+
+        result = factors[0]
+        for factor in factors[1:]:
+            # Find a shared variable to join on
+            shared_var = next((var for var in result.dependencies if var in factor.dependencies), None)
+            if shared_var is None:
+                raise ValueError("No shared variable to join on")
+
+            result = Factor.join(result, factor)
+
+        return result
+
+def variable_elimination(X, e, bn):
+    # Step 1: Call topological_sort_elim and save that as the variable order
+    var_order = bn.topological_sort_elim(e.keys())
+
+    # Step 2: Create a set of variables that are neither the query variable nor in the evidence and call this set sum_over
+    sum_over = set(var_order) - set([X]) - set(e.keys())
+
+    # Initialize the factors list with a factor for each variable in the variable order
+    factors = []
+
+    for var in var_order:
+        factors.append(Factor(bn, e, var))
+
+        if var in sum_over:
+            # Find all factors with the current variable as a dependency
+            dependent_factors = [factor for factor in factors if var in factor.dependencies]
+
+            # If the variable is in sum_over, replace the dependent factors with a join_all of them, then group by the target variable
+            new_factor = Factor.join_all(dependent_factors).group_by(var)
+
+
+            # Replace the dependent factors in the factors list with the new factor
+            factors = [factor for factor in factors if factor not in dependent_factors] + [new_factor]
+
+        # Print the probabilities to the console
+        print(f"----- Variable: {var} -----")
+        print("Factors:")
+        for fr in factors:
+            for values, prob in fr.probabilities.items():
+                print(f"{dict(values)}: {prob}")
+            print()
+
+
+
+    # The final factor is the answer to the query
+    final_factor = Factor.join_all(factors)
+    print(f"RESULT:")
+    result = {values[0][1]:prob for values, prob in final_factor.probabilities.items()}
+    result = normalize(result)
+    for key, value in result.items():
+        print(f"P({X} = {key} | {dict(e)}) = {value}")
 
 def main():
     if len(sys.argv) != 4:
@@ -270,8 +328,7 @@ def main():
         enumeration_ask(X, e, bayes_net)
     elif method == "elim":
         # Call to variable elimination function
-        print(bayes_net.nodes)
-        print(bayes_net.topological_sort_elim(e.keys()))
+        variable_elimination(X, e, bayes_net)
     else:
         print("Invalid method. Choose 'elim' or 'enum'.")
 
